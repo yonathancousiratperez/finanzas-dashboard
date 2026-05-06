@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
 :root {
   --bg: #0d0d0d;
@@ -123,7 +124,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   padding: 20px; box-shadow: var(--card-shadow);
 }
 .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.chart-container { position: relative; height: 220px; }
+.chart-container { position: relative; height: 280px; }
+.chart-container-tall { position: relative; height: 340px; }
 
 /* CAT BARS */
 .cat-list { display: flex; flex-direction: column; gap: 12px; }
@@ -171,6 +173,34 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 .meta-nombre { font-size: 14px; font-weight: 600; }
 .meta-pct { font-size: 13px; color: var(--accent-light); font-weight: 600; }
 
+/* NOTIFICACIONES */
+.notif-filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.notif-filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); transition: all 0.15s; }
+.notif-filter-btn.active, .notif-filter-btn:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-light); }
+.notif-group-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin: 20px 0 10px; padding-left: 4px; }
+.notif-list { display: flex; flex-direction: column; gap: 10px; }
+.notif-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 20px; box-shadow: var(--card-shadow); display: flex; align-items: flex-start; gap: 14px;
+  border-left: 4px solid var(--border); transition: transform 0.15s;
+}
+.notif-card:hover { transform: translateX(2px); }
+.notif-card.urgente { border-left-color: var(--danger); }
+.notif-card.pronto { border-left-color: var(--warning); }
+.notif-card.ok { border-left-color: var(--success); }
+.notif-card.completada { opacity: 0.5; }
+.notif-icon { font-size: 24px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+.notif-body { flex: 1; }
+.notif-desc { font-size: 14px; font-weight: 500; line-height: 1.4; margin-bottom: 6px; }
+.notif-meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.notif-fecha { font-size: 12px; color: var(--text-muted); }
+.notif-dias-badge { font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+.notif-dias-badge.urgente { background: rgba(239,68,68,0.2); color: #fca5a5; }
+.notif-dias-badge.pronto { background: rgba(245,158,11,0.2); color: #fcd34d; }
+.notif-dias-badge.ok { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+.notif-dias-badge.completada { background: var(--border); color: var(--text-muted); }
+.notif-tipo-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: var(--accent-dim); color: var(--accent-light); font-weight: 500; }
+
 /* LOADING */
 .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; gap: 12px; color: var(--text-muted); }
 .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -216,6 +246,9 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
     </div>
     <div class="nav-item" onclick="showSection('vencimientos')">
       <span class="icon">📅</span> Vencimientos
+    </div>
+    <div class="nav-item" onclick="showSection('notificaciones')">
+      <span class="icon">🔔</span> Notificaciones
     </div>
     <div class="nav-item" onclick="showSection('metas')">
       <span class="icon">🎯</span> Metas
@@ -267,6 +300,12 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
       <div id="vencimientos-content"><div class="loading"><div class="spinner"></div></div></div>
     </section>
 
+    <!-- NOTIFICACIONES -->
+    <section class="section" id="sec-notificaciones">
+      <div class="section-title">Notificaciones</div>
+      <div id="notificaciones-content"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
+
     <!-- METAS -->
     <section class="section" id="sec-metas">
       <div class="section-title">Metas</div>
@@ -306,7 +345,7 @@ function closeSidebar() {
 }
 
 // NAVIGATION
-const titles = { resumen:'Resumen', cuentas:'Cuentas', categorias:'Categorías', registros:'Registros', vencimientos:'Vencimientos', metas:'Metas' };
+const titles = { resumen:'Resumen', cuentas:'Cuentas', categorias:'Categorías', registros:'Registros', vencimientos:'Vencimientos', notificaciones:'Notificaciones', metas:'Metas' };
 function showSection(id) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -362,6 +401,7 @@ function renderAll() {
   renderCategorias();
   renderRegistros();
   renderVencimientos();
+  renderNotificaciones();
   renderMetas();
 }
 
@@ -384,6 +424,7 @@ function renderResumen() {
     <div class="kpi-card"><span class="kpi-icon">📤</span><div class="kpi-label">Gasto del mes</div><div class="kpi-value" style="color:var(--danger)">${gs(gastoMes)}</div><div class="kpi-sub">${regs.filter(r=>r.concepto&&r.concepto.toLowerCase()==='salida').length} transacciones</div></div>
     <div class="kpi-card"><span class="kpi-icon">📊</span><div class="kpi-label">Presupuesto usado</div><div class="kpi-value" style="color:${progressColor(presPct)}">${presPct}%</div><div class="kpi-sub">${gs(presUsado)} de ${gs(presTotal)}</div></div>
     <div class="kpi-card"><span class="kpi-icon">📂</span><div class="kpi-label">Categorías</div><div class="kpi-value">${cats.length}</div><div class="kpi-sub">${cats.filter(c=>pct(c.gasto_mes_actual,c.presupuesto_mensual)>=100).length} sobre presupuesto</div></div>
+    <div class="kpi-card" onclick="showSection('notificaciones')" style="cursor:pointer"><span class="kpi-icon">🔔</span><div class="kpi-label">Alertas activas</div><div class="kpi-value" style="color:var(--warning)">${(DATA.notificaciones||[]).filter(n=>n.estado==='pendiente').length}</div><div class="kpi-sub">${(DATA.notificaciones||[]).filter(n=>{ const d=diasHastaFecha(n.fecha_evento); return n.estado==='pendiente'&&d<=3&&d>=0; }).length} urgentes esta semana</div></div>
   </div>`;
 
   // últimos 5 registros
@@ -445,24 +486,33 @@ function renderCategorias() {
   const labels = cats.map(c => (c.emoji||'') + ' ' + (c.nombre||c.id_categoria));
   const gastos = cats.map(c => Number(c.gasto_mes_actual) || 0);
   const presupuestos = cats.map(c => Number(c.presupuesto_mensual) || 0);
-  const COLORS = ['#7c3aed','#a78bfa','#6d28d9','#8b5cf6','#c4b5fd','#5b21b6','#4c1d95','#ede9fe'];
+  const totalGasto = gastos.reduce((a,b) => a+b, 0);
+
+  const COLORS = [
+    '#7c3aed','#06b6d4','#f59e0b','#10b981','#ef4444',
+    '#3b82f6','#f97316','#ec4899','#84cc16','#8b5cf6',
+    '#14b8a6','#fb923c','#a3e635'
+  ];
+  const COLORS_50 = COLORS.map(c => c + '99');
+
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
   const tickColor = isDark ? '#94a3b8' : '#64748b';
+  const borderBg = isDark ? '#1a1a2e' : '#ffffff';
 
   const chartsHtml = `<div class="charts-grid">
     <div class="chart-card"><h3>Distribución de gastos</h3><div class="chart-container"><canvas id="chart-donut"></canvas></div></div>
-    <div class="chart-card"><h3>Presupuesto vs Gasto</h3><div class="chart-container"><canvas id="chart-bars"></canvas></div></div>
+    <div class="chart-card"><h3>Presupuesto vs Gasto</h3><div class="chart-container chart-container-tall"><canvas id="chart-bars"></canvas></div></div>
   </div>`;
 
-  const catsHtml = `<div class="card" style="margin-top:0"><div class="cat-list">${cats.map(c => {
+  const catsHtml = `<div class="card" style="margin-top:0"><div class="cat-list">${cats.map((c,i) => {
     const p = pct(Number(c.gasto_mes_actual)||0, Number(c.presupuesto_mensual)||0);
     return `<div class="cat-item">
       <div class="cat-header">
-        <span class="cat-name">${c.emoji||''} ${c.nombre||c.id_categoria}</span>
+        <span class="cat-name" style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:${COLORS[i%COLORS.length]};display:inline-block;flex-shrink:0"></span>${c.emoji||''} ${c.nombre||c.id_categoria}</span>
         <span class="cat-amounts">${gs(c.gasto_mes_actual)} / ${gs(c.presupuesto_mensual)} · <strong style="color:${progressColor(p)}">${p}%</strong></span>
       </div>
-      <div class="cat-bar"><div class="cat-fill" style="width:${p}%;background:${progressColor(p)}"></div></div>
+      <div class="cat-bar"><div class="cat-fill" style="width:${p}%;background:${COLORS[i%COLORS.length]}"></div></div>
     </div>`;
   }).join('')}</div></div>`;
 
@@ -471,10 +521,54 @@ function renderCategorias() {
   if (charts.donut) { charts.donut.destroy(); delete charts.donut; }
   if (charts.bars) { charts.bars.destroy(); delete charts.bars; }
 
+  // Registrar plugin datalabels globalmente si no está
+  if (window.ChartDataLabels) Chart.register(window.ChartDataLabels);
+
   charts.donut = new Chart(document.getElementById('chart-donut'), {
     type: 'doughnut',
-    data: { labels, datasets: [{ data: gastos, backgroundColor: COLORS, borderWidth: 2, borderColor: isDark ? '#1a1a2e' : '#fff' }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: tickColor, font: { size: 11 }, boxWidth: 12, padding: 12 } } } }
+    plugins: window.ChartDataLabels ? [window.ChartDataLabels] : [],
+    data: {
+      labels,
+      datasets: [{
+        data: gastos,
+        backgroundColor: COLORS.slice(0, cats.length),
+        borderWidth: 3,
+        borderColor: borderBg,
+        hoverBorderWidth: 2,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: tickColor, font: { size: 12 }, usePointStyle: true, pointStyleWidth: 10, padding: 16 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const val = ctx.parsed;
+              const pctVal = totalGasto > 0 ? ((val/totalGasto)*100).toFixed(1) : 0;
+              return ` ${gs(val)}  (${pctVal}%)`;
+            }
+          }
+        },
+        datalabels: window.ChartDataLabels ? {
+          color: '#fff',
+          font: { size: 11, weight: 'bold' },
+          formatter: (val) => {
+            if (!totalGasto || val === 0) return '';
+            const p = (val/totalGasto*100).toFixed(0);
+            return p >= 5 ? p + '%' : '';
+          },
+          textShadowBlur: 4,
+          textShadowColor: 'rgba(0,0,0,0.6)'
+        } : { display: false }
+      }
+    }
   });
 
   charts.bars = new Chart(document.getElementById('chart-bars'), {
@@ -482,16 +576,41 @@ function renderCategorias() {
     data: {
       labels,
       datasets: [
-        { label: 'Presupuesto', data: presupuestos, backgroundColor: 'rgba(124,58,237,0.3)', borderColor: '#7c3aed', borderWidth: 1 },
-        { label: 'Gasto', data: gastos, backgroundColor: 'rgba(239,68,68,0.5)', borderColor: '#ef4444', borderWidth: 1 }
+        {
+          label: 'Presupuesto',
+          data: presupuestos,
+          backgroundColor: isDark ? 'rgba(148,163,184,0.18)' : 'rgba(100,116,139,0.15)',
+          borderColor: isDark ? 'rgba(148,163,184,0.5)' : 'rgba(100,116,139,0.4)',
+          borderWidth: 1,
+          borderRadius: 4
+        },
+        {
+          label: 'Gasto',
+          data: gastos,
+          backgroundColor: COLORS.slice(0, cats.length).map(c => c + 'bb'),
+          borderColor: COLORS.slice(0, cats.length),
+          borderWidth: 1.5,
+          borderRadius: 4
+        }
       ]
     },
     options: {
-      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-      plugins: { legend: { labels: { color: tickColor, font: { size: 11 } } } },
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { labels: { color: tickColor, font: { size: 12 }, usePointStyle: true } },
+        tooltip: {
+          callbacks: { label: ctx => ` ${gs(ctx.raw)}` }
+        },
+        datalabels: { display: false }
+      },
       scales: {
-        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 }, callback: v => 'Gs.' + (v/1000000).toFixed(1)+'M' } },
-        y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 } } }
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: tickColor, font: { size: 10 }, callback: v => v >= 1000000 ? 'Gs.' + (v/1000000).toFixed(1)+'M' : v >= 1000 ? 'Gs.' + (v/1000).toFixed(0)+'K' : 'Gs.'+v }
+        },
+        y: { grid: { display: false }, ticks: { color: tickColor, font: { size: 11 } } }
       }
     }
   });
@@ -575,6 +694,85 @@ function renderMetas() {
     </div>`;
   }).join('')}</div>`;
   document.getElementById('metas-content').innerHTML = html;
+}
+
+// NOTIFICACIONES
+function diasHastaFecha(fechaStr) {
+  if (!fechaStr) return 999;
+  try {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const fecha = new Date(fechaStr); fecha.setHours(0,0,0,0);
+    return Math.round((fecha - hoy) / (1000*60*60*24));
+  } catch(e) { return 999; }
+}
+
+let notifFiltro = 'todas';
+
+function renderNotificaciones() {
+  const notifs = DATA.notificaciones || [];
+  const el = document.getElementById('notificaciones-content');
+  if (!notifs.length) { el.innerHTML = '<div class="empty">Sin notificaciones registradas</div>'; return; }
+
+  const tipoIcono = { vto_factura:'🧾', vto_tarjeta:'💳', presupuesto:'📊' };
+  const tipoLabel = { vto_factura:'Factura', vto_tarjeta:'Tarjeta', presupuesto:'Presupuesto' };
+
+  const enriched = notifs.map(n => {
+    const dias = diasHastaFecha(n.fecha_evento);
+    const esPendiente = (n.estado||'').toLowerCase() === 'pendiente';
+    let urgencia, cls;
+    if (!esPendiente) { urgencia = 'completada'; cls = 'completada'; }
+    else if (dias < 0)  { urgencia = 'vencida';    cls = 'urgente'; }
+    else if (dias === 0){ urgencia = 'hoy';         cls = 'urgente'; }
+    else if (dias <= 3) { urgencia = 'pronto';      cls = 'pronto'; }
+    else                { urgencia = 'ok';          cls = 'ok'; }
+    return { ...n, dias, urgencia, cls };
+  });
+
+  const filtrados = notifFiltro === 'todas' ? enriched
+    : enriched.filter(n => n.tipo === notifFiltro);
+
+  const grupos = [
+    { key: 'vencida', label: '🔴 Vencidas', items: filtrados.filter(n => n.urgencia === 'vencida') },
+    { key: 'hoy',     label: '🚨 Vencen hoy', items: filtrados.filter(n => n.urgencia === 'hoy') },
+    { key: 'pronto',  label: '🟡 Esta semana (1-3 días)', items: filtrados.filter(n => n.urgencia === 'pronto') },
+    { key: 'ok',      label: '🟢 Próximas', items: filtrados.filter(n => n.urgencia === 'ok') },
+    { key: 'completada', label: '✅ Completadas / enviadas', items: filtrados.filter(n => n.urgencia === 'completada') }
+  ].filter(g => g.items.length > 0);
+
+  const tiposDisp = [...new Set(notifs.map(n => n.tipo).filter(Boolean))];
+  const filtrosHtml = `<div class="notif-filters">
+    <button class="notif-filter-btn ${notifFiltro==='todas'?'active':''}" onclick="setNotifFiltro('todas')">Todas (${notifs.length})</button>
+    ${tiposDisp.map(t => `<button class="notif-filter-btn ${notifFiltro===t?'active':''}" onclick="setNotifFiltro('${t}')">${tipoIcono[t]||'🔔'} ${tipoLabel[t]||t} (${notifs.filter(n=>n.tipo===t).length})</button>`).join('')}
+  </div>`;
+
+  const cardsHtml = grupos.map(g => `
+    <div class="notif-group-title">${g.label}</div>
+    <div class="notif-list">${g.items.map(n => {
+      const icono = tipoIcono[n.tipo] || '🔔';
+      const diasText = n.urgencia === 'vencida' ? `Venció hace ${Math.abs(n.dias)} día${Math.abs(n.dias)!==1?'s':''}`
+        : n.urgencia === 'hoy' ? 'Vence hoy 🚨'
+        : n.dias < 999 ? `${n.dias} día${n.dias!==1?'s':''} restante${n.dias!==1?'s':''}`
+        : '-';
+      return `<div class="notif-card ${n.cls}">
+        <div class="notif-icon">${icono}</div>
+        <div class="notif-body">
+          <div class="notif-desc">${n.descripcion||'-'}</div>
+          <div class="notif-meta">
+            <span class="notif-fecha">📅 ${fmtDate(n.fecha_evento)}</span>
+            <span class="notif-dias-badge ${n.cls}">${diasText}</span>
+            <span class="notif-tipo-badge">${tipoLabel[n.tipo]||n.tipo||'-'}</span>
+            ${n.recurrencia && n.recurrencia !== 'ninguna' ? `<span style="font-size:11px;color:var(--text-muted)">↻ ${n.recurrencia}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}</div>`).join('');
+
+  el.innerHTML = filtrosHtml + (cardsHtml || '<div class="empty">Sin notificaciones en este filtro</div>');
+}
+
+function setNotifFiltro(f) {
+  notifFiltro = f;
+  renderNotificaciones();
 }
 
 // INIT
