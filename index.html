@@ -38,6 +38,56 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; transition: background 0.3s, color 0.3s; }
 
+/* LOGIN */
+#login-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0d0d0d;
+  display: flex; align-items: center; justify-content: center;
+}
+[data-theme="light"] #login-screen { background: #f1f5f9; }
+.login-box {
+  background: #1a1a2e; border: 1px solid rgba(124,58,237,0.3);
+  border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 400px;
+  box-shadow: 0 24px 80px rgba(124,58,237,0.2);
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+}
+[data-theme="light"] .login-box { background: #ffffff; border-color: rgba(124,58,237,0.2); box-shadow: 0 24px 80px rgba(124,58,237,0.1); }
+.login-logo { font-size: 40px; margin-bottom: 8px; }
+.login-title { font-size: 22px; font-weight: 700; color: #a78bfa; margin-bottom: 4px; }
+.login-sub { font-size: 13px; color: #94a3b8; margin-bottom: 32px; }
+.login-label { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; align-self: flex-start; margin-bottom: 6px; }
+.login-input-wrap { position: relative; width: 100%; margin-bottom: 8px; }
+.login-input {
+  width: 100%; padding: 12px 44px 12px 16px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; color: #f8fafc; font-size: 15px; font-family: 'Inter', sans-serif;
+  outline: none; transition: border 0.2s;
+}
+[data-theme="light"] .login-input { background: #f8fafc; border-color: rgba(0,0,0,0.1); color: #1e293b; }
+.login-input:focus { border-color: #7c3aed; }
+.login-toggle-pw {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 16px; padding: 0;
+}
+.login-error {
+  width: 100%; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #fca5a5;
+  margin-bottom: 16px; display: none; text-align: center;
+}
+.login-error.show { display: block; }
+.login-btn {
+  width: 100%; padding: 13px; background: #7c3aed; border: none; border-radius: 10px;
+  color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+  transition: background 0.2s, transform 0.1s; margin-top: 8px;
+}
+.login-btn:hover { background: #6d28d9; }
+.login-btn:active { transform: scale(0.98); }
+.login-btn:disabled { background: #4c1d95; cursor: not-allowed; opacity: 0.7; }
+.login-remember { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; font-size: 12px; color: #94a3b8; cursor: pointer; }
+.login-remember input { accent-color: #7c3aed; width: 14px; height: 14px; cursor: pointer; }
+.login-shake { animation: shake 0.4s ease; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+
 /* SIDEBAR */
 .sidebar {
   width: var(--sidebar-w); min-height: 100vh; background: var(--surface);
@@ -224,6 +274,23 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">💜</div>
+    <div class="login-title">Finanzas</div>
+    <div class="login-sub">Dashboard personal — acceso privado</div>
+    <div class="login-label">Contraseña</div>
+    <div class="login-input-wrap">
+      <input class="login-input" type="password" id="login-pw" placeholder="Ingresá tu contraseña" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
+      <button class="login-toggle-pw" type="button" onclick="togglePw()" id="pw-eye">👁</button>
+    </div>
+    <div class="login-error" id="login-error">Contraseña incorrecta. Intentá de nuevo.</div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Ingresar</button>
+    <label class="login-remember"><input type="checkbox" id="login-remember"> Recordar en este navegador</label>
+  </div>
+</div>
+
 <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
 
 <aside class="sidebar" id="sidebar">
@@ -319,6 +386,56 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 const API_URL = 'https://script.google.com/macros/s/AKfycbzJosXRLwA2Vzf0VGa2sRjsMvOrFKSwNkJBCA_2Z7zhvYPQF4jZ9FoNfbOO0qgYufvt/exec';
 let DATA = null;
 let charts = {};
+
+// LOGIN
+const PW_HASH = '9b17da08c35a73507ba5dffc5df6b13d576a20205bb977c60d3d83ee59394b4a';
+const AUTH_KEY = 'fin_auth_v1';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function checkStoredAuth() {
+  const stored = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
+  if (stored === PW_HASH) {
+    document.getElementById('login-screen').style.display = 'none';
+    loadData();
+  } else {
+    setTimeout(() => document.getElementById('login-pw').focus(), 100);
+  }
+}
+
+async function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  if (!pw) return;
+  btn.disabled = true; btn.textContent = '...';
+  const hash = await sha256(pw);
+  if (hash === PW_HASH) {
+    const remember = document.getElementById('login-remember').checked;
+    if (remember) localStorage.setItem(AUTH_KEY, hash);
+    else sessionStorage.setItem(AUTH_KEY, hash);
+    document.getElementById('login-screen').style.display = 'none';
+    loadData();
+  } else {
+    err.classList.add('show');
+    document.getElementById('login-box') && document.getElementById('login-box').classList.add('login-shake');
+    document.querySelector('.login-box').classList.add('login-shake');
+    setTimeout(() => document.querySelector('.login-box').classList.remove('login-shake'), 500);
+    btn.disabled = false; btn.textContent = 'Ingresar';
+    document.getElementById('login-pw').value = '';
+    document.getElementById('login-pw').focus();
+  }
+}
+
+function togglePw() {
+  const inp = document.getElementById('login-pw');
+  const eye = document.getElementById('pw-eye');
+  if (inp.type === 'password') { inp.type = 'text'; eye.textContent = '🙈'; }
+  else { inp.type = 'password'; eye.textContent = '👁'; }
+}
 
 // THEME
 const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -776,7 +893,7 @@ function setNotifFiltro(f) {
 }
 
 // INIT
-loadData();
+checkStoredAuth();
 </script>
 </body>
 </html>
