@@ -262,6 +262,45 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .empty { text-align: center; padding: 48px; color: var(--text-muted); font-size: 14px; }
 
+/* Tarjeta de cuenta clickeable */
+.card.clickable { cursor: pointer; }
+.card.clickable:hover { border-color: var(--accent); transform: translateY(-2px); }
+.card-open-hint { margin-top: 10px; font-size: 11px; color: var(--accent-light); font-weight: 500; }
+
+/* Modal de detalle por cuenta */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);
+  display: none; align-items: center; justify-content: center; z-index: 200; padding: 16px;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  width: 100%; max-width: 720px; max-height: 88vh; display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+}
+.modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 18px 20px; border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 18px; font-weight: 700; }
+.modal-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.modal-body { padding: 16px 20px 20px; overflow-y: auto; }
+.modal-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.modal-kpi { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.modal-kpi .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
+.modal-kpi .v { font-size: 16px; font-weight: 700; margin-top: 4px; }
+.mov-list { display: flex; flex-direction: column; gap: 8px; }
+.mov {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2);
+}
+.mov-left { min-width: 0; }
+.mov-det { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mov-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.mov-amount { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.mov-group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin: 16px 0 8px; }
+@media (max-width: 560px) { .modal-kpis { grid-template-columns: 1fr; } }
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .sidebar { transform: translateX(-100%); }
@@ -328,6 +367,9 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
     <div class="nav-item" onclick="showSection('cuentas')">
       <span class="icon">💳</span> Cuentas
     </div>
+    <div class="nav-item" onclick="showSection('deudas')">
+      <span class="icon">🏦</span> Deudas
+    </div>
     <div class="nav-item" onclick="showSection('categorias')">
       <span class="icon">📂</span> Categorías
     </div>
@@ -372,6 +414,12 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
       <div id="cuentas-content"><div class="loading"><div class="spinner"></div></div></div>
     </section>
 
+    <!-- DEUDAS -->
+    <section class="section" id="sec-deudas">
+      <div class="section-title">Deudas y préstamos</div>
+      <div id="deudas-content"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
+
     <!-- CATEGORIAS -->
     <section class="section" id="sec-categorias">
       <div class="section-title">Categorías</div>
@@ -406,11 +454,18 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 </main>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbzJosXRLwA2Vzf0VGa2sRjsMvOrFKSwNkJBCA_2Z7zhvYPQF4jZ9FoNfbOO0qgYufvt/exec';
+// v2 expone además Deudas y Transferencias. Si todavía no está autorizada,
+// se cae al endpoint viejo y el dashboard sigue funcionando sin el bloque de deudas.
+const API_URLS = [
+  'https://script.google.com/macros/s/AKfycbywWMLVYj_RBqJbytZ9UUnDn-GznH6Nkd_8K46d3gNqQKrEH84MtbPdEIPHh0CCyjYz_g/exec',
+  'https://script.google.com/macros/s/AKfycbzJosXRLwA2Vzf0VGa2sRjsMvOrFKSwNkJBCA_2Z7zhvYPQF4jZ9FoNfbOO0qgYufvt/exec'
+];
 let DATA = null;
 let charts = {};
 // Sistema mono-usuario: todas las cuentas y registros son de Yonathan.
 const CURRENT_USER = 'yonathan';
+// Categoría reservada para la carga inicial de saldos: no es gasto del mes.
+const CAT_APERTURA = 'SaldoInicial';
 
 function filtrarCuentas() {
   const all = DATA.cuentas || [];
@@ -504,7 +559,7 @@ function closeSidebar() {
 }
 
 // NAVIGATION
-const titles = { resumen:'Resumen', cuentas:'Cuentas', categorias:'Categorías', registros:'Registros', vencimientos:'Vencimientos', notificaciones:'Notificaciones', metas:'Metas' };
+const titles = { resumen:'Resumen', cuentas:'Cuentas', deudas:'Deudas', categorias:'Categorías', registros:'Registros', vencimientos:'Vencimientos', notificaciones:'Notificaciones', metas:'Metas' };
 function showSection(id) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -525,6 +580,10 @@ function pct(used, total) {
 }
 function fmtDate(str) {
   if (!str) return '-';
+  // Una fecha sin hora (2026-08-01) la parsea como UTC y en GMT-3 retrocede un día.
+  const soloFecha = String(str).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (soloFecha) return soloFecha[3] + '/' + soloFecha[2] + '/' + soloFecha[1];
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
   try { return new Date(str).toLocaleDateString('es-PY', { day:'2-digit', month:'2-digit', year:'numeric' }); } catch(e) { return str; }
 }
 function badgeType(tipo) {
@@ -540,9 +599,20 @@ function progressColor(p) {
 // DATA
 async function loadData() {
   try {
-    const res = await fetch(API_URL);
-    DATA = await res.json();
-    if (DATA.error) throw new Error(DATA.error);
+    let ultimoError = null;
+    DATA = null;
+    for (const url of API_URLS) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) { ultimoError = new Error('HTTP ' + res.status); continue; }
+        const json = await res.json();
+        if (json.error) { ultimoError = new Error(json.error); continue; }
+        DATA = json;
+        break;
+      } catch (err) { ultimoError = err; }
+    }
+    if (!DATA) throw (ultimoError || new Error('Sin respuesta de la API'));
+    sanearDatos();
     renderAll();
     const t = new Date(DATA.generatedAt);
     document.getElementById('last-update').textContent = 'Actualizado: ' + t.toLocaleTimeString('es-PY');
@@ -552,11 +622,26 @@ async function loadData() {
   }
 }
 
+// La hoja arrastra filas fantasma (sin id pero con formato), que la API devuelve
+// como objetos vacíos. Sin esto salen tarjetas en blanco.
+function sanearDatos() {
+  const claveId = {
+    cuentas: 'id_cuenta', categorias: 'id_categoria', registros: 'id_registro',
+    deudas: 'id_deuda', transferencias: 'id_transf', metas: 'id_meta', notificaciones: 'id'
+  };
+  for (const [coleccion, campo] of Object.entries(claveId)) {
+    if (Array.isArray(DATA[coleccion])) {
+      DATA[coleccion] = DATA[coleccion].filter(x => String(x[campo] ?? '').trim() !== '');
+    }
+  }
+}
+
 function refreshData() { loadData(); }
 
 function renderAll() {
   renderResumen();
   renderCuentas();
+  renderDeudas();
   renderCategorias();
   renderRegistros();
   renderVencimientos();
@@ -575,14 +660,19 @@ function renderResumen() {
   const saldoTotal = cuentasDebito.reduce((s, c) => s + (Number(c.saldo_actual) || 0), 0);
   const cuentasActivas = cuentasDebito.length;
   const tarjetasActivas = cuentasCredito.length;
-  const creditoDisponible = cuentasCredito.reduce((s, c) => {
+  // En una tarjeta, saldo_actual YA es el crédito disponible; lo consumido es límite − disponible.
+  const creditoDisponible = cuentasCredito.reduce((s, c) => s + (Number(c.saldo_actual) || 0), 0);
+  const creditoUsado = cuentasCredito.reduce((s, c) => {
     const limite = Number(c.limite) || 0;
-    const usado = Number(c.saldo_actual) || 0;
-    return s + Math.max(0, limite - usado);
+    return s + Math.max(0, limite - (Number(c.saldo_actual) || 0));
   }, 0);
-  const gastoMes = regs.filter(r => r.concepto && r.concepto.toLowerCase() === 'salida').reduce((s, r) => s + (Number(r.monto) || 0), 0);
-  const presTotal = cats.reduce((s, c) => s + catPresupuesto(c), 0);
-  const presUsado = cats.reduce((s, c) => s + catGasto(c), 0);
+  // `SaldoInicial` son reconstrucciones del saldo de apertura, no gasto del mes.
+  const esGastoReal = r => (r.concepto || '').toLowerCase() === 'salida' && r.categoria !== CAT_APERTURA;
+  const gastosReales = regs.filter(esGastoReal);
+  const gastoMes = gastosReales.reduce((s, r) => s + (Number(r.monto) || 0), 0);
+  const catsReales = cats.filter(c => c.nombre !== CAT_APERTURA);
+  const presTotal = catsReales.reduce((s, c) => s + catPresupuesto(c), 0);
+  const presUsado = catsReales.reduce((s, c) => s + catGasto(c), 0);
   const presPct = pct(presUsado, presTotal);
 
   const userLabel = '👤 Yonathan';
@@ -593,8 +683,8 @@ function renderResumen() {
   </div>
   <div class="kpi-grid">
     <div class="kpi-card"><span class="kpi-icon">💰</span><div class="kpi-label">Saldo total</div><div class="kpi-value">${gs(saldoTotal)}</div><div class="kpi-sub">${cuentasActivas} cuentas débito activas</div></div>
-    <div class="kpi-card"><span class="kpi-icon">💳</span><div class="kpi-label">Tarjetas de crédito activas</div><div class="kpi-value">${tarjetasActivas}</div><div class="kpi-sub">Crédito disponible: ${gs(creditoDisponible)}</div></div>
-    <div class="kpi-card"><span class="kpi-icon">📤</span><div class="kpi-label">Gasto del mes</div><div class="kpi-value" style="color:var(--danger)">${gs(gastoMes)}</div><div class="kpi-sub">${regs.filter(r=>r.concepto&&r.concepto.toLowerCase()==='salida').length} transacciones</div></div>
+    <div class="kpi-card"><span class="kpi-icon">💳</span><div class="kpi-label">Crédito disponible</div><div class="kpi-value">${gs(creditoDisponible)}</div><div class="kpi-sub">${tarjetasActivas} tarjetas · ${gs(creditoUsado)} consumido</div></div>
+    <div class="kpi-card"><span class="kpi-icon">📤</span><div class="kpi-label">Gasto del mes</div><div class="kpi-value" style="color:var(--danger)">${gs(gastoMes)}</div><div class="kpi-sub">${gastosReales.length} transacciones</div></div>
     <div class="kpi-card"><span class="kpi-icon">📊</span><div class="kpi-label">Presupuesto usado</div><div class="kpi-value" style="color:${progressColor(presPct)}">${presPct}%</div><div class="kpi-sub">${gs(presUsado)} de ${gs(presTotal)}</div></div>
     <div class="kpi-card"><span class="kpi-icon">📂</span><div class="kpi-label">Categorías</div><div class="kpi-value">${cats.length}</div><div class="kpi-sub">${cats.filter(c=>pct(c.gasto_mes_actual,c.presupuesto_mensual)>=100).length} sobre presupuesto</div></div>
     <div class="kpi-card" onclick="showSection('notificaciones')" style="cursor:pointer"><span class="kpi-icon">🔔</span><div class="kpi-label">Alertas activas</div><div class="kpi-value" style="color:var(--warning)">${(DATA.notificaciones||[]).filter(n=>n.estado==='pendiente').length}</div><div class="kpi-sub">${(DATA.notificaciones||[]).filter(n=>{ const d=diasHastaFecha(n.fecha_evento); return n.estado==='pendiente'&&d<=3&&d>=0; }).length} urgentes esta semana</div></div>
@@ -636,19 +726,147 @@ function renderCuentas() {
     const usado = saldoI - saldoA;
     const p = limite > 0 ? pct(usado, limite) : pct(Math.max(0, saldoI - saldoA), saldoI);
     const color = progressColor(p);
-    return `<div class="card">
+    const nMov = movimientosDeCuenta(c.id_cuenta).length;
+    return `<div class="card clickable" onclick="abrirCuenta('${c.id_cuenta}')">
       <div class="card-header">
         <div><div class="card-name">${c.nombre}</div><div class="card-type">${c.titular||''}</div></div>
         <span class="badge ${badgeType(c.tipo)}">${c.tipo}</span>
       </div>
       <div class="saldo-actual">${gs(saldoA)}</div>
-      <div class="saldo-label">Saldo actual · inicial ${gs(saldoI)}</div>
+      <div class="saldo-label">${c.tipo === 'credito' ? 'Crédito disponible' : 'Saldo actual'} · inicial ${gs(saldoI)}</div>
       ${limite > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${p}%;background:${color}"></div></div>
       <div class="progress-text"><span>${gs(usado)} usado</span><span>Límite ${gs(limite)}</span></div>` : ''}
       ${c.dia_vencimiento ? `<div style="margin-top:10px;font-size:12px;color:var(--text-muted)">Vence día ${c.dia_vencimiento} · Cierre día ${c.dia_cierre}</div>` : ''}
+      <div class="card-open-hint">Ver ${nMov} movimiento${nMov === 1 ? '' : 's'} de esta cuenta →</div>
     </div>`;
   }).join('')}</div>`;
   document.getElementById('cuentas-content').innerHTML = html;
+}
+
+// DETALLE DE UNA CUENTA — lista propia de gastos e ingresos
+function movimientosDeCuenta(id) {
+  const nombreCuenta = (cid) => {
+    const c = (DATA.cuentas || []).find(x => x.id_cuenta === cid);
+    return c ? c.nombre : (cid || '-');
+  };
+  const regs = (DATA.registros || [])
+    .filter(r => r.id_cuenta === id)
+    .map(r => ({
+      fecha: r.fecha,
+      entrada: (r.concepto || '').toLowerCase() === 'entrada',
+      detalle: r.comercio || r.categoria || 'Sin detalle',
+      meta: r.categoria || '-',
+      monto: Number(r.monto) || 0
+    }));
+  const transf = (DATA.transferencias || [])
+    .filter(t => t.id_cuenta_origen === id || t.id_cuenta_destino === id)
+    .map(t => {
+      const esDestino = t.id_cuenta_destino === id;
+      return {
+        fecha: t.fecha_iso || t.fecha,
+        entrada: esDestino,
+        detalle: esDestino
+          ? 'Transferencia desde ' + nombreCuenta(t.id_cuenta_origen)
+          : 'Transferencia hacia ' + nombreCuenta(t.id_cuenta_destino),
+        meta: 'Transferencia · no cuenta como gasto',
+        monto: Number(t.monto) || 0
+      };
+    });
+  return regs.concat(transf).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+}
+
+function abrirCuenta(id) {
+  const c = (DATA.cuentas || []).find(x => x.id_cuenta === id);
+  if (!c) return;
+  const movs = movimientosDeCuenta(id);
+  const entradas = movs.filter(m => m.entrada).reduce((s, m) => s + m.monto, 0);
+  const salidas  = movs.filter(m => !m.entrada).reduce((s, m) => s + m.monto, 0);
+  const esCredito = c.tipo === 'credito';
+
+  document.getElementById('modal-cuenta-nombre').textContent = c.nombre;
+  document.getElementById('modal-cuenta-sub').textContent =
+    (esCredito ? 'Crédito disponible ' : 'Saldo actual ') + gs(c.saldo_actual) +
+    ' · ' + movs.length + ' movimiento' + (movs.length === 1 ? '' : 's');
+
+  const kpis = `<div class="modal-kpis">
+    <div class="modal-kpi"><div class="k">Ingresos</div><div class="v amount-in">+${gs(entradas)}</div></div>
+    <div class="modal-kpi"><div class="k">${esCredito ? 'Consumos' : 'Gastos'}</div><div class="v amount-out">-${gs(salidas)}</div></div>
+    <div class="modal-kpi"><div class="k">${esCredito ? 'Línea' : 'Saldo inicial'}</div><div class="v">${gs(esCredito ? c.limite : c.saldo_inicial)}</div></div>
+  </div>`;
+
+  const fila = (m) => `<div class="mov">
+    <div class="mov-left">
+      <div class="mov-det">${m.detalle}</div>
+      <div class="mov-meta">${fmtDate(m.fecha)} · ${m.meta}</div>
+    </div>
+    <div class="mov-amount ${m.entrada ? 'amount-in' : 'amount-out'}">${m.entrada ? '+' : '-'}${gs(m.monto)}</div>
+  </div>`;
+
+  const listaIn  = movs.filter(m => m.entrada);
+  const listaOut = movs.filter(m => !m.entrada);
+  const bloque = (titulo, lista) => lista.length
+    ? `<div class="mov-group-title">${titulo} (${lista.length})</div><div class="mov-list">${lista.map(fila).join('')}</div>`
+    : '';
+
+  document.getElementById('modal-cuenta-body').innerHTML = movs.length
+    ? kpis + bloque(esCredito ? 'Consumos' : 'Gastos', listaOut) + bloque('Ingresos', listaIn)
+    : kpis + '<div class="empty">Esta cuenta todavía no tiene movimientos.</div>';
+
+  document.getElementById('modal-cuenta').classList.add('open');
+}
+
+function cerrarCuenta() { document.getElementById('modal-cuenta').classList.remove('open'); }
+function cerrarCuentaSiFondo(ev) { if (ev.target.id === 'modal-cuenta') cerrarCuenta(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarCuenta(); });
+
+// DEUDAS
+function renderDeudas() {
+  const cont = document.getElementById('deudas-content');
+  const deudas = DATA.deudas || [];
+  if (!deudas.length) {
+    cont.innerHTML = '<div class="empty">Sin deudas cargadas.<br><small>Si acabás de crearlas, la API todavía no expone la hoja <b>Deudas</b>.</small></div>';
+    return;
+  }
+  const activas = deudas.filter(d => String(d.estado || '').toLowerCase() !== 'pagada');
+  const totalPendiente = activas.reduce((s, d) => s + (Number(d.saldo_pendiente) || 0), 0);
+  const totalCuotaMes  = activas.reduce((s, d) => s + (Number(d.cuota_monto) || 0), 0);
+
+  const kpis = `<div class="kpi-grid" style="margin-bottom:24px">
+    <div class="kpi"><div class="kpi-label">Deuda total pendiente</div><div class="kpi-value">${gs(totalPendiente)}</div></div>
+    <div class="kpi"><div class="kpi-label">Cuotas del mes</div><div class="kpi-value">${gs(totalCuotaMes)}</div></div>
+    <div class="kpi"><div class="kpi-label">Préstamos activos</div><div class="kpi-value">${activas.length}</div></div>
+  </div>`;
+
+  const cards = deudas.map(d => {
+    const total    = Number(d.capital_total) || 0;
+    const pagado   = Number(d.total_pagado) || 0;
+    const pend     = Number(d.saldo_pendiente) || 0;
+    const cuotasT  = Number(d.cuotas_totales) || 0;
+    const cuotasP  = Number(d.cuotas_pagadas) || 0;
+    const p        = total > 0 ? pct(pagado, total) : 0;
+    const esTarjeta = String(d.tipo || '') === 'tarjeta_cuotas';
+    const cuenta = esTarjeta && d.id_cuenta
+      ? ((DATA.cuentas || []).find(c => c.id_cuenta === d.id_cuenta) || {}).nombre
+      : null;
+    return `<div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-name">${d.nombre || d.id_deuda}</div>
+          <div class="card-type">${d.acreedor || ''}${cuenta ? ' · ' + cuenta : ''}</div>
+        </div>
+        <span class="badge ${esTarjeta ? 'badge-credito' : 'badge-cooperativa'}">${esTarjeta ? 'tarjeta en cuotas' : 'préstamo'}</span>
+      </div>
+      <div class="saldo-actual">${gs(pend)}</div>
+      <div class="saldo-label">Saldo pendiente · total ${gs(total)}</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${p}%;background:var(--success)"></div></div>
+      <div class="progress-text"><span>${cuotasP} de ${cuotasT} cuotas</span><span>${p}% pagado</span></div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-muted)">
+        Cuota ${gs(d.cuota_monto)}${d.dia_vencimiento ? ' · vence día ' + d.dia_vencimiento : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  cont.innerHTML = kpis + `<div class="cards-grid">${cards}</div>`;
 }
 
 // CATEGORIAS
@@ -953,5 +1171,19 @@ function setNotifFiltro(f) {
 // INIT
 checkStoredAuth();
 </script>
+
+<!-- Detalle de movimientos de una cuenta -->
+<div class="modal-backdrop" id="modal-cuenta" onclick="cerrarCuentaSiFondo(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="modal-cuenta-nombre"></div>
+        <div class="modal-sub" id="modal-cuenta-sub"></div>
+      </div>
+      <button class="btn-icon" onclick="cerrarCuenta()" title="Cerrar">✕</button>
+    </div>
+    <div class="modal-body" id="modal-cuenta-body"></div>
+  </div>
+</div>
 </body>
 </html>
