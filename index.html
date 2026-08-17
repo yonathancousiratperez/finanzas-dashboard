@@ -454,11 +454,10 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 </main>
 
 <script>
-// v2 expone además Deudas y Transferencias. Si todavía no está autorizada,
-// se cae al endpoint viejo y el dashboard sigue funcionando sin el bloque de deudas.
+// API v2: expone Deudas y Transferencias, y exige `?t=` (ver TOKEN_KEY).
+// Ya no hay fallback al endpoint viejo: ese no pedía token y anulaba la protección.
 const API_URLS = [
-  'https://script.google.com/macros/s/AKfycbywWMLVYj_RBqJbytZ9UUnDn-GznH6Nkd_8K46d3gNqQKrEH84MtbPdEIPHh0CCyjYz_g/exec',
-  'https://script.google.com/macros/s/AKfycbzJosXRLwA2Vzf0VGa2sRjsMvOrFKSwNkJBCA_2Z7zhvYPQF4jZ9FoNfbOO0qgYufvt/exec'
+  'https://script.google.com/macros/s/AKfycbywWMLVYj_RBqJbytZ9UUnDn-GznH6Nkd_8K46d3gNqQKrEH84MtbPdEIPHh0CCyjYz_g/exec'
 ];
 let DATA = null;
 let charts = {};
@@ -487,6 +486,10 @@ function catPresupuesto(c) {
 // LOGIN
 const PW_HASH = 'b91cb5d87ae019aa31a9274554e411be24f1e766a517edde143b1c7ee87a536d';
 const AUTH_KEY = 'fin_auth_v2';
+// El token de la API se deriva de la contraseña escrita y NO va en el código.
+// Sin él la URL de la API sola no sirve para leer las finanzas.
+const TOKEN_KEY = 'fin_token_v2';
+let API_TOKEN = '';
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -495,12 +498,26 @@ async function sha256(str) {
 
 function checkStoredAuth() {
   const stored = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
-  if (stored === PW_HASH) {
+  API_TOKEN = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+  if (stored === PW_HASH && API_TOKEN) {
     document.getElementById('login-screen').style.display = 'none';
     loadData();
   } else {
     setTimeout(() => document.getElementById('login-pw').focus(), 100);
   }
+}
+
+// La API rechazó el token: la sesión guardada ya no sirve (contraseña cambiada, por ejemplo).
+function cerrarSesion() {
+  [localStorage, sessionStorage].forEach(s => { s.removeItem(AUTH_KEY); s.removeItem(TOKEN_KEY); });
+  API_TOKEN = '';
+  const pantalla = document.getElementById('login-screen');
+  pantalla.style.display = '';
+  const err = document.getElementById('login-error');
+  if (err) { err.textContent = 'La sesión expiró. Ingresá la contraseña de nuevo.'; err.classList.add('show'); }
+  const btn = document.getElementById('login-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
+  document.getElementById('last-update').textContent = 'Sesión cerrada';
 }
 
 async function doLogin() {
@@ -511,9 +528,11 @@ async function doLogin() {
   btn.disabled = true; btn.textContent = '...';
   const hash = await sha256(pw);
   if (hash === PW_HASH) {
+    API_TOKEN = await sha256('finapi:' + pw);
     const remember = document.getElementById('login-remember').checked;
-    if (remember) localStorage.setItem(AUTH_KEY, hash);
-    else sessionStorage.setItem(AUTH_KEY, hash);
+    const store = remember ? localStorage : sessionStorage;
+    store.setItem(AUTH_KEY, hash);
+    store.setItem(TOKEN_KEY, API_TOKEN);
     document.getElementById('login-screen').style.display = 'none';
     loadData();
   } else {
@@ -603,9 +622,10 @@ async function loadData() {
     DATA = null;
     for (const url of API_URLS) {
       try {
-        const res = await fetch(url);
+        const res = await fetch(url + '?t=' + encodeURIComponent(API_TOKEN));
         if (!res.ok) { ultimoError = new Error('HTTP ' + res.status); continue; }
         const json = await res.json();
+        if (json.error === 'no autorizado') { cerrarSesion(); return; }
         if (json.error) { ultimoError = new Error(json.error); continue; }
         DATA = json;
         break;
