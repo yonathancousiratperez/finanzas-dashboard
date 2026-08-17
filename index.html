@@ -52,7 +52,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   display: flex; flex-direction: column; align-items: center; gap: 0;
 }
 [data-theme="light"] .login-box { background: #ffffff; border-color: rgba(124,58,237,0.2); box-shadow: 0 24px 80px rgba(124,58,237,0.1); }
-.login-logo { font-size: 40px; margin-bottom: 8px; }
+.login-logo { line-height: 0; margin-bottom: 12px; filter: drop-shadow(0 6px 16px rgba(124,58,237,0.45)); }
 .login-title { font-size: 22px; font-weight: 700; color: #a78bfa; margin-bottom: 4px; }
 .login-sub { font-size: 13px; color: #94a3b8; margin-bottom: 32px; }
 .login-label { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; align-self: flex-start; margin-bottom: 6px; }
@@ -282,7 +282,25 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
   <div class="login-box">
-    <div class="login-logo">💜</div>
+    <div class="login-logo">
+      <svg width="54" height="54" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Corona">
+        <defs>
+          <linearGradient id="crown-g" x1="8" y1="8" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#c4b5fd"/>
+            <stop offset="0.55" stop-color="#a78bfa"/>
+            <stop offset="1" stop-color="#6d28d9"/>
+          </linearGradient>
+        </defs>
+        <path d="M8 22 L20 34 L32 13 L44 34 L56 22 L50 46 L14 46 Z"
+              fill="url(#crown-g)" stroke="#7c3aed" stroke-width="2.5"
+              stroke-linejoin="round" stroke-linecap="round"/>
+        <rect x="13" y="49" width="38" height="9" rx="3"
+              fill="url(#crown-g)" stroke="#7c3aed" stroke-width="2.5"/>
+        <circle cx="8" cy="22" r="3.6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+        <circle cx="32" cy="13" r="4.2" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+        <circle cx="56" cy="22" r="3.6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+      </svg>
+    </div>
     <div class="login-title">Finanzas</div>
     <div class="login-sub">Dashboard personal — acceso privado</div>
     <div class="login-label">Contraseña</div>
@@ -300,14 +318,8 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
-    <h1>💜 Finanzas</h1>
+    <h1>👑 Finanzas</h1>
     <p>Dashboard personal</p>
-  </div>
-  <div class="user-selector">
-    <div class="user-selector-label">Vista</div>
-    <button class="user-btn" data-user="general" onclick="setUser('general')">🏠 Familia</button>
-    <button class="user-btn" data-user="yonathan" onclick="setUser('yonathan')">👤 Yonathan</button>
-    <button class="user-btn" data-user="edith" onclick="setUser('edith')">👤 Edith</button>
   </div>
   <nav class="nav">
     <div class="nav-item active" onclick="showSection('resumen')">
@@ -397,45 +409,29 @@ tbody td { padding: 12px 16px; vertical-align: middle; }
 const API_URL = 'https://script.google.com/macros/s/AKfycbzJosXRLwA2Vzf0VGa2sRjsMvOrFKSwNkJBCA_2Z7zhvYPQF4jZ9FoNfbOO0qgYufvt/exec';
 let DATA = null;
 let charts = {};
-let CURRENT_USER = localStorage.getItem('fin_user') || 'general';
-const USER_IDS = { yonathan: '966257802', edith: '8252721945' };
-
-function setUser(u) {
-  CURRENT_USER = u;
-  localStorage.setItem('fin_user', u);
-  document.querySelectorAll('.user-btn').forEach(b => b.classList.toggle('active', b.dataset.user === u));
-  if (DATA) renderAll();
-}
+// Sistema mono-usuario: todas las cuentas y registros son de Yonathan.
+const CURRENT_USER = 'yonathan';
 
 function filtrarCuentas() {
   const all = DATA.cuentas || [];
-  const activas = all.filter(c => c.activa === true || c.activa === 'TRUE');
-  if (CURRENT_USER === 'general') return activas;
-  return activas.filter(c => c.titular === CURRENT_USER || c.titular === 'compartida');
+  return all.filter(c => c.activa === true || c.activa === 'TRUE');
 }
 
 function filtrarRegistros() {
-  const all = DATA.registros || [];
-  if (CURRENT_USER === 'general') return all;
-  const uid = USER_IDS[CURRENT_USER];
-  return all.filter(r => String(r.user_id_tg) === uid);
+  return DATA.registros || [];
 }
 
 function catGasto(c) {
-  const key = 'gasto_mes_' + CURRENT_USER;
-  if (CURRENT_USER !== 'general' && c[key] !== undefined && c[key] !== '') return Number(c[key]) || 0;
   return Number(c.gasto_mes_actual) || 0;
 }
 
 function catPresupuesto(c) {
-  const key = 'presupuesto_' + CURRENT_USER;
-  if (CURRENT_USER !== 'general' && c[key] !== undefined && c[key] !== '') return Number(c[key]) || 0;
   return Number(c.presupuesto_mensual) || 0;
 }
 
 // LOGIN
-const PW_HASH = '9b17da08c35a73507ba5dffc5df6b13d576a20205bb977c60d3d83ee59394b4a';
-const AUTH_KEY = 'fin_auth_v1';
+const PW_HASH = 'b91cb5d87ae019aa31a9274554e411be24f1e766a517edde143b1c7ee87a536d';
+const AUTH_KEY = 'fin_auth_v2';
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -443,7 +439,6 @@ async function sha256(str) {
 }
 
 function checkStoredAuth() {
-  document.querySelectorAll('.user-btn').forEach(b => b.classList.toggle('active', b.dataset.user === CURRENT_USER));
   const stored = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
   if (stored === PW_HASH) {
     document.getElementById('login-screen').style.display = 'none';
@@ -590,7 +585,7 @@ function renderResumen() {
   const presUsado = cats.reduce((s, c) => s + catGasto(c), 0);
   const presPct = pct(presUsado, presTotal);
 
-  const userLabel = CURRENT_USER === 'general' ? '🏠 Familia' : CURRENT_USER === 'yonathan' ? '👤 Yonathan' : '👤 Edith';
+  const userLabel = '👤 Yonathan';
   const kpis = `
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
     <div class="section-title" style="margin:0">Resumen</div>
@@ -624,7 +619,9 @@ function renderResumen() {
 
   document.getElementById('resumen-content').innerHTML = kpis + regsHtml;
 
+  // Destroy old chart
   if (charts.resumen) { charts.resumen.destroy(); delete charts.resumen; }
+  // No chart on resumen for simplicity — covered in categorias
 }
 
 // CUENTAS
@@ -698,6 +695,7 @@ function renderCategorias() {
   if (charts.donut) { charts.donut.destroy(); delete charts.donut; }
   if (charts.bars) { charts.bars.destroy(); delete charts.bars; }
 
+  // Registrar plugin datalabels globalmente si no está
   if (window.ChartDataLabels) Chart.register(window.ChartDataLabels);
 
   charts.donut = new Chart(document.getElementById('chart-donut'), {
@@ -855,6 +853,7 @@ function renderMetas() {
   const metas = DATA.metas || [];
   if (!metas.length) { document.getElementById('metas-content').innerHTML = '<div class="empty">Sin metas registradas</div>'; return; }
 
+  // Detect columns dynamically
   const sample = metas[0];
   const keys = Object.keys(sample);
 
